@@ -67,7 +67,7 @@ python .agents/skills/paper-workflow-orchestrator/scripts/workflow_guard.py --st
 
 runner 本身不能替代所有流程前置检查。Full 必须包含真实 V/V/UQ 与语义证据；若代理目标需要，必须保留参考指标比较。post-full 校验 sealed Full，运行原 decision/fidelity/reports、刷新 paper_assets 并生成正式结果图。不要修改 sealed run、复制旧 manifest、只拼接局部结果或手工改 PASS。上游代码、输入、路线或配置变化后重新执行受影响流程；组合候选也必须重新运行，分别有效不推出组合有效。
 
-负面敏感性/失败场景保留为 RETAIN_EVIDENCE，并将限制交给原 evidence/writer；不为了获得正文结论删掉坏结果。`GOAL_PARTIAL/PARTIAL_MET` 仅在硬证据通过且限制明确时进入写作，不是全面目标实现。源码依据：orchestrator `scripts/run_post_full.py:46–78,135–176`、`SKILL.md` 的 S6 段。
+负面敏感性/失败场景保留为 RETAIN_EVIDENCE；不为了获得正文结论删掉坏结果。RETAIN_EVIDENCE 是否进入 writer 由 Writing Handoff Filter 决定：只有实质影响最终结论、模型选择、适用边界或正式结果解释的证据才传播，其他内容继续留在审计记录中。`GOAL_PARTIAL/PARTIAL_MET` 仅在硬证据通过且限制明确时进入写作，不是全面目标实现。源码依据：orchestrator `scripts/run_post_full.py:46–78,135–176`、`SKILL.md` 的 S6 段。
 
 ## 已知接入限制与失败处置
 
@@ -88,6 +88,36 @@ runner 本身不能替代所有流程前置检查。Full 必须包含真实 V/V/
 
 分别记录优化接受、正式证据和论文交付，不合成一个模糊的成功状态。修复接口不恢复因实质错误撤回的接受；恢复前仍须针对实际采纳版本完成 VALID/VALUE。
 
+## Writing Handoff Filter
+
+Full-flow 中，Evidence Auditor PASS 后由主 `modeling-solution-optimizer` 执行 handoff 过滤；这里不复制 auditor、writer 或 QA 的实现。三个子 Agent 应优先调用目标 MathModel 项目已有的 evidence、writer、QA/guard 能力，并以目标项目当前源码和正式入口为准。子 Agent 只返回 findings/status 给主 optimizer，不自行路由或调用下一个 specialist。
+
+Writer 默认只接收以下白名单：
+
+```text
+accepted final modeling logic
+authoritative final results
+required problem outputs
+accepted figures/tables
+supported problem-level findings
+material limitations
+formal references
+```
+
+默认不传：
+
+```text
+optimization_log 全文
+DISCARD candidates
+debug / repair history
+resolved warnings
+internal guardrails
+unsupported hypotheses
+无实质影响的 negative evidence
+```
+
+这些内容仍完整保留用于审计。若 Auditor 或 Writer 对某一具体 claim、数字、图表或限制提出可定位的证据疑点，主 optimizer 可以按需回溯对应记录并只补充解决该疑点所需的最小上下文；不得因此把完整 optimization history 自动暴露给 writer。
+
 ## writer 与编译交接
 
 论文修订需使摘要与完整方案一致，由问题特征解释模型选择，讲清公式的目的、变量和作用；题目要求的实际答案应能定位，结果解释须有证据，小问之间的依赖应清楚，创新和局限须对应实际修改、验证及适用边界。修订时双向核对：
@@ -100,7 +130,7 @@ runner 本身不能替代所有流程前置检查。Full 必须包含真实 V/V/
 
 可以引用 baseline、消融和负面实验，但须区分其角色、来源、版本与评价口径，不能将对照冒充最终方案或混用不同口径的数字。实际答案已有而正文仅列性能指标等表达缺失交给 writer 补齐；证据不足则返回验证或收紧结论，不以写作要求为由编造机制解释。以上内容与证据要求同样适用于下述已授权直接修订；不改变各自的授权和门禁边界。
 
-将 current best 的真实结果、比较、负面证据、限制和待验证项交给唯一正式 writer。正式数字遵从 `metrics.json` 的唯一 metric_id，图表遵从现有索引与 stable ID。先通过 writer 门禁，再按它的当前计划操作：
+将 Writing Handoff Filter 产出的白名单内容交给唯一正式 writer。负面证据、限制和待验证项不再默认全量传递；只有 filter 判定为 material 的部分进入正式写作输入。正式数字遵从 `metrics.json` 的唯一 metric_id，图表遵从现有索引与 stable ID。先通过 writer 门禁，再按它的当前计划操作：
 
 ```bash
 python .agents/skills/paper-workflow-orchestrator/scripts/workflow_guard.py --skill paper-formal-writer
