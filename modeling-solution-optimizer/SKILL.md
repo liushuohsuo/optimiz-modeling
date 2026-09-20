@@ -29,7 +29,11 @@ description: 对已有首轮模型、可运行代码和真实结果的数学建�
 
 ### REVIEW：由证据提出方向
 
-检查现实要求是否被正确转为目标、变量、约束和假设，以及错误遗漏、性能与规模瓶颈、模型适配、结构性限制、机制解释及验证缺口；数据、标签、预处理和评价协议也可能是瓶颈。论文中解释不清的结论也可能暴露模型问题。可从可信结果中寻找有价值的阈值、权衡、适用边界和决策规律。每个方向引用当前题目、代码或结果中的依据，说明预计竞赛价值和可证伪的验证办法；优先做最有价值且预算内可验证的方向。
+检查现实要求是否被正确转为目标、变量、约束和假设，以及错误遗漏、性能与规模瓶颈、模型适配、结构性限制、机制解释及验证缺口；数据、标签、预处理和评价协议也可能是瓶颈。论文中解释不清的结论也可能暴露模型问题。
+
+区分**模型诊断**与**问题层洞察**：误差变化、指标变化、困难子群或模型响应首先只是诊断现象；只有存在明确 evidence chain 支持其对原问题或系统结构的解释时，才提升为阈值、阶段变化、权衡、失效条件、适用边界或决策规律。证据可以来自受控比较、扰动、多指标或多条件一致性、模型结果、解析推导或独立验证；不要求必须来自模型之外，也不得由单一诊断现象直接推出问题规律。
+
+每个方向引用当前题目、代码或结果中的依据，说明预计竞赛价值和可证伪的验证办法；优先做最有价值且预算内可验证的方向。
 
 | 动作 | 依据与范围 |
 | --- | --- |
@@ -81,9 +85,15 @@ description: 对已有首轮模型、可运行代码和真实结果的数学建�
 
 ### Full-flow
 
-仅当用户要求完整优化交付时启用。冻结最终 current best 后，主 optimizer 依次调度：
+仅当用户要求完整优化交付时启用。冻结最终 current best 后，先按 [MathModel 集成](references/mathmodel-integration.md) 刷新该版本受影响的 authoritative final run、正式 evidence 与正式 assets；刷新失败、绑定失效或证据仍 stale 时，不得进入 Evidence Auditor/Writer，并按 `EVIDENCE_BLOCKER` 处理。
+
+随后由主 optimizer 依次调度：
 
 ```text
+freeze current best
+    ↓
+refresh authoritative final run / formal evidence / assets
+    ↓
 Evidence Auditor
     ↓ PASS
 Writing Handoff Filter
@@ -92,6 +102,8 @@ Paper Writer
     ↓
 Final QA
 ```
+
+Evidence Auditor、Paper Writer 和 Final QA 必须优先使用运行环境可用的原生 sub-agent / delegation 机制在**独立上下文**中执行，不得仅由主 optimizer 在同一上下文中依次模拟三个角色。若当前运行环境不支持真实子 Agent，则明确报告降级为 `sequential single-agent execution`；可以继续完成受控流程，但不得将该次执行宣称为 multi-agent Full-flow。
 
 所有 routing authority 保留在主 `modeling-solution-optimizer`：
 
