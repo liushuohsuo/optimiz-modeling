@@ -154,16 +154,16 @@ When invoking the writer subagent, give it the following role:
 The accepted solution and verified evidence are authoritative. Do not change the accepted model or invent formal results.
 
 **Competition Writing Principles**
-1. **Abstract = compressed solution**：摘要压缩呈现问题、核心方法、关键结果与最终结论，而不是写工作过程。
-2. **Problem analysis bridges problem → model**：问题分析必须解释题目结构如何导向变量、假设、分解和模型选择。
-3. **Mathematics has purpose**：公式出现时说明它解决什么问题、变量含义及其在整体方案中的作用。
-4. **Actual answers visible**：题目要求的实际答案、决策或数值必须能在正文或明确附件中定位，不用性能指标替代题目答案。
-5. **Answer → Evidence → Interpretation → Implication**：重要结果按答案、证据、解释、意义的顺序组织。
-6. **Explicit subproblem handoff**：多小问之间明确说明上游输出如何成为下游输入、假设或约束。
-7. **Concrete innovation/limitation**：创新与局限必须对应真实模型设计、验证结果和适用边界，避免泛化口号。
-8. **No internal reasoning leakage**：不写入 Agent 思维链、候选淘汰过程、调试历史、内部 guardrail 或无关优化轨迹。
-9. **One caveat, one home**：同一限制在最合适的位置完整说明一次，必要时交叉引用，避免全文反复堆叠。
-10. **Rigor without redundancy**：保持证据、定义、单位和口径严谨，但不重复同一事实、公式解释或结论。
+1. **Abstract = compressed solution**：摘要像压缩后的完整论文，交代问题、核心建模思路与方法、经过验证的关键结果、最终结论和真实贡献；数值使用适合交流的精度，不机械复制原始计算的全部小数位，也不写优化过程。
+2. **Problem analysis bridges problem → model**：问题分析解释题目结构如何导向变量、假设、分解和模型选择，承担“为什么这样建模”的桥梁作用；属于 Results 的详细数值、比较和实验结论不要提前重复。
+3. **Mathematics has purpose**：公式出现时说明它解决什么问题、变量含义及其在整体方案中的作用；公式不是脱离建模逻辑的装饰。
+4. **Actual answers visible**：题目要求的实际答案、决策或数值必须能在正文或明确附件中定位，不用性能指标替代题目答案；输出规模较大时，正文给出可理解的摘要，并明确引用包含完整结果的表格或附件。
+5. **Answer → Evidence → Interpretation → Implication**：重要结果按答案、证据、解释、意义组织；模型诊断本身不自动成为问题规律，但当明确 evidence chain 支持时，应进一步提炼并说明阈值、阶段变化、权衡、失效条件或适用边界。
+6. **Explicit subproblem handoff**：多小问之间明确说明上游输出如何成为下游输入、假设或约束，并在必要时交代语义、单位及误差影响。
+7. **Concrete innovation/limitation**：创新按“问题 → 修改 → 机制 → 证据”说明，局限对应真实失效机制、影响与适用边界；避免泛化口号、奖项式自夸或空泛不足。
+8. **No internal reasoning leakage**：不写入 Agent 思维链、候选淘汰过程、调试历史、内部 review/guardrail、已解决 warning 或与最终科学解释无关的优化轨迹。
+9. **One caveat, one home**：同一限制在最合适的位置完整说明一次，必要时交叉引用；不要为了显得谨慎而在摘要、正文、结果和结论中反复堆叠同一 caveat。
+10. **Rigor without redundancy**：保持证据、定义、单位、数值精度和评价口径一致；Problem Analysis、Results、Validation、Model Evaluation、Abstract 与 Conclusion 之间不要重复同一组 metrics、验证说明或限制，除非每次出现承担不同的论证功能。
 
 #### Final QA
 
