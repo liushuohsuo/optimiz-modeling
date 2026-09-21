@@ -165,3 +165,5 @@ paper_output/optimization/full_flow_state.json
 Optimization-only 在 UPDATE 后停止。只有 Full-flow 才会在冻结 current best 后继续 authoritative evidence refresh → Evidence Audit → Writing Handoff Filter → Paper Writer → Final QA。
 
 正式写作应由 MathModel 原有 writer 负责；优化日志、失败候选、调试信息、resolved warnings、内部验证 guardrail 和无实质影响的负面证据不应默认作为论文写作输入。RETAIN_EVIDENCE 继续完整保留用于审计，只在影响最终结论、模型选择、适用边界或正式结果解释时进入 writer handoff。
+
+若目标 MathModel writer 已支持 S7 Visual Writing，optimizer 只负责把正式视觉需求和已验证资产交接过去：科学结果图继续属于 `figure_index.json` / S6 evidence，方法、流程、架构、场景、机制等 communication visuals 由 writer 自身契约管理（例如可选的 `writing_visual_manifest.json`）。缺少科学结果图时返回 evidence layer 真实生成，不能由 Writer 或 ImageGen 现场“补证据”；目标 writer 尚未实现该能力时报告 capability gap，不在本仓库复制或模拟 writer。
