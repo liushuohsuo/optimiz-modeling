@@ -260,14 +260,19 @@ Auditor PASS 后，主 optimizer 依据 [MathModel 集成](references/mathmodel-
 **MAY**
 - 重组论文结构与论证；
 - 改写表达；
-- 使用已验证的数字、图、表、公式和正式引用。
+- 使用已验证的数字、图、表、公式和正式引用；
+- 当目标 MathModel writer 已提供 S7 Visual Writing 能力时，识别并使用其正式注册的 communication visuals。
 
 **MUST NOT**
 - 改 accepted model/current best；
 - 重新计算或重定义正式结果；
 - 发明数字、机制或验证结论；
+- 在 WRITING 中用示意图或 ImageGen 代替缺失的科学结果图、敏感性图或数据证据图；
+- 把仅用于解释方法、场景或机制的 writing visual 冒充 S6 scientific evidence；
 - 默认读取完整 `optimization_log`、DISCARD/debug/repair history；
 - 自行调用 Auditor、QA 或其他 specialist。
+
+若 Writer 发现最终论证需要新的科学结果图，而 authoritative evidence layer 尚未产生该图，必须返回 `EVIDENCE_BLOCKER`，并将 blocker 标记为 `EVIDENCE_VISUAL_GAP`；主 optimizer 应回到 FORMAL_REFRESH / 对应 evidence layer，而不是允许 Writer 现场生成“证据图”。
 
 **RETURN**：必须返回结构化写作结果：
 
