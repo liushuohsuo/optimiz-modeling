@@ -67,6 +67,8 @@ optimizer 默认三候选与 MathModel 每问三条不同路线的正式探索�
 
 原 MathModel 的 S0–S8、runner、evidence pipeline、writer 和 QA 的内部阶段继续保持各自权威。Full-flow state 只记录“哪个现有能力已被实际执行、由哪个 delegation 返回、结果是什么”，不把这些能力重新实现成新的通用 workflow engine。
 
+Delegation receipt 不绑定某个 runtime 的固定字段名：记录运行时实际提供的 delegation identity，并用可复核的 `result_locator` 指向返回结果；没有真实返回或无法定位 provenance 时，不得把阶段写成完成。
+
 ## 正式证据刷新
 
 ACCEPT 只表示隔离比较中候选值得采纳，正式项目状态仍由 MathModel 判定。在有支持的真实 Pilot 且登记新鲜后：
@@ -170,6 +172,8 @@ python .agents/skills/paper-formal-writer/scripts/accept_delivery.py --project-r
 ## 用户授权的直接修订
 
 正式交接阻塞且用户明确要求直接修订论文时，可以制作独立可审阅版本；已有明确授权直接沿用，无需重复确认。没有该授权则报告阻塞，不自动切换。输出放在独立交付目录，不覆盖或冒充正式流程产物。
+
+Direct revision 是独立 review artifact，**MUST NOT** 满足 Full-flow 的 `WRITING` 或 `FINAL_QA` completion，也 **MUST NOT** 更新 `full_flow_state.json` 中这些阶段为完成或推动 `overall` 向 `DONE` 前进。只有正式 delegation + 对应正式返回合同可以推进 Full-flow state。
 
 数字和图表绑定已识别的真实输出，同步检查受影响章节、摘要、结论及图表，检查全部渲染页面，并保留内容与视觉检查记录；检查未完成时只报告未完成稿。只表述已验证范围，未决结论写明限制。在独立版本的交付说明中标明仍未通过的正式门禁，不继承 S6/S8 或 submission_ready，也不称其由正式 MathModel 链路生成。该分支不豁免模型有效性检查，不把被撤回的结论重新写成事实。
 

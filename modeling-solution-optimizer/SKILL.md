@@ -123,22 +123,22 @@ DONE
 
 - **Entry**：FORMAL_REFRESH = COMPLETE，且 frozen current best、正式 evidence chain 与硬约束记录可定位。
 - **Execution**：运行环境存在原生 sub-agent / delegation 能力时，主 optimizer **MUST spawn Evidence Auditor** 并在独立上下文中执行。主 optimizer **MUST NOT** 在同一上下文模拟 Auditor，也不得用自写“PASS”替代真实返回。
-- **Complete only if**：真实 Auditor delegation 已发生，存在可定位的 `agent_id` 与 `result_ref`，结果已返回，且 auditor `status = PASS`。
+- **Complete only if**：真实 Auditor delegation 已发生；存在运行时返回的 delegation identifier；Auditor 返回结果已被捕获；其结果 provenance 可通过 `result_locator` 定位；且 auditor `status = PASS`。不得要求运行时必须提供名为 `result_ref` 的特定字段。
 - **Next**：`PASS → Writing Handoff Filter → WRITING`；`EVIDENCE_BLOCKER → FORMAL_REFRESH / relevant evidence layer`。若当前运行环境不支持真实 delegation，则 Full-flow 在此标记 `BLOCKED_NO_DELEGATION`，不得把 sequential single-agent execution 宣称为完成。
 
 **WRITING**
 
 - **Entry**：Evidence Auditor receipt 存在且 `status = PASS`，Writing Handoff Filter 已生成最小正式写作输入。
 - **Execution**：主 optimizer **MUST spawn Paper Writer**，由独立子 Agent 调用目标项目现有 `paper-formal-writer` 能力；Main 不得直接代写正式论文来满足此阶段。
-- **Complete only if**：真实 Writer delegation 已发生，存在 `agent_id` 与 `result_ref`，writer 返回正式论文产物及其 evidence/asset 引用，且 `status = COMPLETE`。
+- **Complete only if**：真实 Writer delegation 已发生；存在运行时返回的 delegation identifier；Writer 返回结果已被捕获；其结果 provenance 可通过 `result_locator` 定位；writer 返回正式论文产物及其 evidence/asset 引用，且 `status = COMPLETE`。
 - **Next**：`COMPLETE → FINAL_QA`；writer 报告证据 blocker → EVIDENCE_AUDIT / FORMAL_REFRESH；纯写作 blocker 按其返回处理。
 
 **FINAL_QA**
 
 - **Entry**：Writer receipt 存在且 `status = COMPLETE`，最终论文产物、handoff 与正式 evidence/asset 索引可定位。
 - **Execution**：主 optimizer **MUST spawn Final QA** 在独立上下文中调用目标项目现有 QA / format / render / delivery 检查；Main 不得自行声明 QA PASS。
-- **Complete only if**：真实 QA delegation 已发生，存在 `agent_id` 与 `result_ref`，结果已返回，且 `status = PASS`。
-- **Next**：`PASS → DONE`；`FIX_WRITING → WRITING`，仅允许一次针对性 Writer 修复后重新 QA；`EVIDENCE_BLOCKER → EVIDENCE_AUDIT / FORMAL_REFRESH`。同一 blocker 在一次针对性修复后仍出现时停止修复循环。
+- **Complete only if**：真实 QA delegation 已发生；存在运行时返回的 delegation identifier；QA 返回结果已被捕获；其结果 provenance 可通过 `result_locator` 定位；且 `status = PASS`。
+- **Next**：`PASS → DONE`；`FIX_WRITING → WRITING` 时仅允许一次针对性 Writer 修复，并在进入修复前将 `repair_budget.writer_fix_used` 从 `0` 更新为 `1`，修复后重新 QA；若该值已为 `1`，再次收到 `FIX_WRITING` 时立即停止修复循环并报告 blocker；`EVIDENCE_BLOCKER → EVIDENCE_AUDIT / FORMAL_REFRESH`。该计数必须写入可恢复 state，不能只依赖当前会话记忆。
 
 只有满足以下不变量时才允许 `overall = DONE`：
 
@@ -163,32 +163,39 @@ paper_output/optimization/full_flow_state.json
 ```json
 {
   "mode": "full-flow",
-  "optimization": "COMPLETE",
-  "current_best": "...",
-  "formal_refresh": "COMPLETE",
+  "optimization": "PENDING",
+  "current_best": null,
+  "formal_refresh": "PENDING",
   "evidence_audit": {
-    "execution": "native_subagent",
-    "agent_id": "...",
-    "result_ref": "...",
-    "status": "PASS"
+    "execution": null,
+    "delegation_id": null,
+    "result_locator": null,
+    "status": "PENDING"
   },
   "writing": {
-    "execution": "native_subagent",
-    "agent_id": "...",
-    "result_ref": "...",
-    "status": "COMPLETE"
+    "execution": null,
+    "delegation_id": null,
+    "result_locator": null,
+    "status": "PENDING"
   },
   "final_qa": {
-    "execution": "native_subagent",
-    "agent_id": "...",
-    "result_ref": "...",
-    "status": "PASS"
+    "execution": null,
+    "delegation_id": null,
+    "result_locator": null,
+    "status": "PENDING"
   },
-  "overall": "DONE"
+  "repair_budget": {
+    "writer_fix_used": 0
+  },
+  "overall": "IN_PROGRESS"
 }
 ```
 
-该文件是 orchestration receipt，不替代 optimization log、正式 evidence、writer 或 QA 自身产物。状态只能依据实际执行结果推进：
+该文件是 orchestration receipt，不替代 optimization log、正式 evidence、writer 或 QA 自身产物。首次进入 Full-flow 时以 `PENDING / IN_PROGRESS` 初始化；只有对应阶段真实完成后，Main 才能更新该阶段字段。
+
+`delegation_id` 是**语义字段**：记录运行时实际返回的 delegation / agent / session identifier，不要求底层接口使用某个固定字段名。`result_locator` 记录可复核的结果定位信息，可以是 runtime result id、message/session ref、artifact path 或 receipt path；只要能从该 locator 找回或核对该次 delegation 的真实返回即可。若运行时没有任何可定位的 delegation identity 或 result provenance，则该阶段不能完成。
+
+状态只能依据实际执行结果推进：
 
 > 没有真实 delegation result ≠ 阶段完成。Main 写一句“Evidence Auditor PASS / Writer COMPLETE / Final QA PASS”不能生成有效 receipt，也不能推进状态。
 
@@ -262,7 +269,25 @@ Auditor PASS 后，主 optimizer 依据 [MathModel 集成](references/mathmodel-
 - 默认读取完整 `optimization_log`、DISCARD/debug/repair history；
 - 自行调用 Auditor、QA 或其他 specialist。
 
-**RETURN**：完成的论文产物、使用的正式 evidence/asset 引用，以及无法仅靠写作解决的 blocker。
+**RETURN**：必须返回结构化写作结果：
+
+```text
+status:
+- COMPLETE
+- WRITING_BLOCKER
+- EVIDENCE_BLOCKER
+
+artifacts:
+- final paper / editable source / compiled delivery as actually produced
+
+evidence_refs:
+- formal evidence / asset locators actually used
+
+blockers:
+- minimal locatable blockers, empty when status = COMPLETE
+```
+
+只有 `status = COMPLETE` 才满足 WRITING completion。写作本身可修的问题返回 `WRITING_BLOCKER`；需要补正式证据或绑定的问题返回 `EVIDENCE_BLOCKER`，不得用“论文文件已生成”替代状态。
 
 When invoking the writer subagent, give it the following role:
 
