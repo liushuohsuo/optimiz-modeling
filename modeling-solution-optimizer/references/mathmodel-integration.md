@@ -54,6 +54,19 @@ optimizer 默认三候选与 MathModel 每问三条不同路线的正式探索�
 
 源码依据：selector `SKILL.md:42–94`；orchestrator `scripts/approve_model_route.py:97–221`、`scripts/workflow_guard.py:491–520`；model generator `scripts/record_pilot.py:45–123`。
 
+## Full-flow orchestration capability mapping
+
+本文件只把 Full-flow 阶段映射到目标 MathModel 项目**已经存在**的能力；orchestration 负责调度和检查 completion receipt，不复制或替代 runner、证据生成器、writer、QA 或它们的门禁逻辑。具体命令、参数和前置条件仍以目标项目当前源码为准。
+
+| Full-flow 阶段 | 复用的目标项目能力 | 编排边界 |
+| --- | --- | --- |
+| `FORMAL_REFRESH` | authoritative full run、`run_post_full.py`、official `evidence_gate.py`、`workflow_guard.py` 及现有 evidence/assets 刷新链 | 只调度现有正式入口；不得手工补 PASS、复制旧 manifest 或另写 evidence pipeline。 |
+| `EVIDENCE_AUDIT` | 现有 `quality-assurance-auditor`、evidence/claim/binding/constraint 检查 | 必须由 Evidence Auditor 子 Agent 在独立上下文调用；只返回 findings/status 给主 optimizer，不自行路由。 |
+| `WRITING` | 现有 `paper-formal-writer` 及其 outline/authoring/validation/compile 能力 | 必须由 Paper Writer 子 Agent 使用过滤后的 handoff 调用；不得复制 writer 或让 optimizer 直接代写来完成阶段。 |
+| `FINAL_QA` | 现有 QA、claim/format/render、视觉检查与 delivery 检查 | 必须由 Final QA 子 Agent独立执行；不得重做模型选择或修改科学结果。 |
+
+原 MathModel 的 S0–S8、runner、evidence pipeline、writer 和 QA 的内部阶段继续保持各自权威。Full-flow state 只记录“哪个现有能力已被实际执行、由哪个 delegation 返回、结果是什么”，不把这些能力重新实现成新的通用 workflow engine。
+
 ## 正式证据刷新
 
 ACCEPT 只表示隔离比较中候选值得采纳，正式项目状态仍由 MathModel 判定。在有支持的真实 Pilot 且登记新鲜后：

@@ -85,29 +85,146 @@ description: 对已有首轮模型、可运行代码和真实结果的数学建�
 
 ### Full-flow
 
-仅当用户要求完整优化交付时启用。冻结最终 current best 后，先按 [MathModel 集成](references/mathmodel-integration.md) 刷新该版本受影响的 authoritative final run、正式 evidence 与正式 assets；刷新失败、绑定失效或证据仍 stale 时，不得进入 Evidence Auditor/Writer，并按 `EVIDENCE_BLOCKER` 处理。
+仅当用户要求完整优化交付时启用。Full-flow 不改变前述 GROUND / REVIEW / BUILD / VERIFY / UPDATE 的科学逻辑、预算、接受标准或 current best 更新规则；它只在最终 current best 已冻结后增加正式证据、独立审计、写作与最终 QA 的编排。
 
-随后由主 optimizer 依次调度：
+显式状态机：
 
 ```text
-freeze current best
+OPTIMIZING
     ↓
-refresh authoritative final run / formal evidence / assets
+FORMAL_REFRESH
     ↓
-Evidence Auditor
-    ↓ PASS
-Writing Handoff Filter
+EVIDENCE_AUDIT
     ↓
-Paper Writer
+WRITING
     ↓
-Final QA
+FINAL_QA
+    ↓
+DONE
 ```
 
-Evidence Auditor、Paper Writer 和 Final QA 必须优先使用运行环境可用的原生 sub-agent / delegation 机制在**独立上下文**中执行，不得仅由主 optimizer 在同一上下文中依次模拟三个角色。若当前运行环境不支持真实子 Agent，则明确报告降级为 `sequential single-agent execution`；可以继续完成受控流程，但不得将该次执行宣称为 multi-agent Full-flow。
+#### Full-flow state contract
+
+**OPTIMIZING**
+
+- **Entry**：用户请求 Full-flow，且尚未存在可恢复的有效 optimization completion。
+- **Execution**：完整执行既有 `GROUND → REVIEW → BUILD → VERIFY → UPDATE`，不改变本 Skill 前述规则。
+- **Complete only if**：最终 current best 已冻结、其有效范围和未验证范围已记录，optimization 状态可恢复。
+- **Next**：`COMPLETE → FORMAL_REFRESH`；真实 blocker → 保持在 optimizer 相应阶段。
+
+**FORMAL_REFRESH**
+
+- **Entry**：current best 已冻结且在其已验证范围内仍有效。
+- **Execution**：按 [MathModel 集成](references/mathmodel-integration.md) 调用目标项目现有 full run / post-full / evidence gate / workflow guard 等正式能力，刷新该版本受影响的 authoritative final run、formal evidence 与 assets。编排层不得复制这些执行器。
+- **Complete only if**：刷新针对实际 frozen current best 完成，正式绑定当前且必要门禁通过；stale evidence、绑定失效或刷新失败均不算完成。
+- **Next**：`PASS → EVIDENCE_AUDIT`；`EVIDENCE_BLOCKER →` 留在 FORMAL_REFRESH 或回对应 evidence layer；只有证据表明 accepted model/组合本身失效时才回 optimizer 的相关验证阶段。
+
+**EVIDENCE_AUDIT**
+
+- **Entry**：FORMAL_REFRESH = COMPLETE，且 frozen current best、正式 evidence chain 与硬约束记录可定位。
+- **Execution**：运行环境存在原生 sub-agent / delegation 能力时，主 optimizer **MUST spawn Evidence Auditor** 并在独立上下文中执行。主 optimizer **MUST NOT** 在同一上下文模拟 Auditor，也不得用自写“PASS”替代真实返回。
+- **Complete only if**：真实 Auditor delegation 已发生，存在可定位的 `agent_id` 与 `result_ref`，结果已返回，且 auditor `status = PASS`。
+- **Next**：`PASS → Writing Handoff Filter → WRITING`；`EVIDENCE_BLOCKER → FORMAL_REFRESH / relevant evidence layer`。若当前运行环境不支持真实 delegation，则 Full-flow 在此标记 `BLOCKED_NO_DELEGATION`，不得把 sequential single-agent execution 宣称为完成。
+
+**WRITING**
+
+- **Entry**：Evidence Auditor receipt 存在且 `status = PASS`，Writing Handoff Filter 已生成最小正式写作输入。
+- **Execution**：主 optimizer **MUST spawn Paper Writer**，由独立子 Agent 调用目标项目现有 `paper-formal-writer` 能力；Main 不得直接代写正式论文来满足此阶段。
+- **Complete only if**：真实 Writer delegation 已发生，存在 `agent_id` 与 `result_ref`，writer 返回正式论文产物及其 evidence/asset 引用，且 `status = COMPLETE`。
+- **Next**：`COMPLETE → FINAL_QA`；writer 报告证据 blocker → EVIDENCE_AUDIT / FORMAL_REFRESH；纯写作 blocker 按其返回处理。
+
+**FINAL_QA**
+
+- **Entry**：Writer receipt 存在且 `status = COMPLETE`，最终论文产物、handoff 与正式 evidence/asset 索引可定位。
+- **Execution**：主 optimizer **MUST spawn Final QA** 在独立上下文中调用目标项目现有 QA / format / render / delivery 检查；Main 不得自行声明 QA PASS。
+- **Complete only if**：真实 QA delegation 已发生，存在 `agent_id` 与 `result_ref`，结果已返回，且 `status = PASS`。
+- **Next**：`PASS → DONE`；`FIX_WRITING → WRITING`，仅允许一次针对性 Writer 修复后重新 QA；`EVIDENCE_BLOCKER → EVIDENCE_AUDIT / FORMAL_REFRESH`。同一 blocker 在一次针对性修复后仍出现时停止修复循环。
+
+只有满足以下不变量时才允许 `overall = DONE`：
+
+```text
+optimization = COMPLETE
+formal_refresh = COMPLETE
+auditor receipt exists AND auditor status = PASS
+writer receipt exists AND writer status = COMPLETE
+qa receipt exists AND qa status = PASS
+```
+
+#### Delegation receipt / state
+
+Full-flow 在目标项目维护一份轻量可恢复状态：
+
+```text
+paper_output/optimization/full_flow_state.json
+```
+
+最小字段：
+
+```json
+{
+  "mode": "full-flow",
+  "optimization": "COMPLETE",
+  "current_best": "...",
+  "formal_refresh": "COMPLETE",
+  "evidence_audit": {
+    "execution": "native_subagent",
+    "agent_id": "...",
+    "result_ref": "...",
+    "status": "PASS"
+  },
+  "writing": {
+    "execution": "native_subagent",
+    "agent_id": "...",
+    "result_ref": "...",
+    "status": "COMPLETE"
+  },
+  "final_qa": {
+    "execution": "native_subagent",
+    "agent_id": "...",
+    "result_ref": "...",
+    "status": "PASS"
+  },
+  "overall": "DONE"
+}
+```
+
+该文件是 orchestration receipt，不替代 optimization log、正式 evidence、writer 或 QA 自身产物。状态只能依据实际执行结果推进：
+
+> 没有真实 delegation result ≠ 阶段完成。Main 写一句“Evidence Auditor PASS / Writer COMPLETE / Final QA PASS”不能生成有效 receipt，也不能推进状态。
 
 所有 routing authority 保留在主 `modeling-solution-optimizer`：
 
 > Subagents return findings and status to the main optimizer. They do not redirect the workflow or invoke another specialist themselves.
+
+#### Continuation / resume
+
+若当前会话或可恢复产物表明 `optimization = COMPLETE` 且 current best 在其已验证范围内仍 valid，而用户随后要求“开始写作”“继续完整流程”“完成最终论文”或“完成论文交付”，将该请求视为 **Full-flow continuation**。
+
+此时：
+
+```text
+MUST NOT rerun completed optimizer
+MUST NOT let Main jump directly to writing
+MUST resume from FORMAL_REFRESH
+```
+
+即：
+
+```text
+Optimization-only DONE
+    ↓ later user requests writing / final delivery
+FORMAL_REFRESH
+    ↓
+EVIDENCE_AUDIT [real subagent]
+    ↓
+WRITING [real subagent]
+    ↓
+FINAL_QA [real subagent]
+    ↓
+DONE
+```
+
+如果恢复检查发现 current best 已失效或原接受依据不再适用，再按前述失效规则回到相应 optimizer/evidence 阶段；不得把“resume”解释成无条件复用过期证据。
 
 #### Evidence Auditor
 
