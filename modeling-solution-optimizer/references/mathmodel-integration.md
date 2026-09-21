@@ -133,56 +133,6 @@ unsupported hypotheses
 
 这些内容仍完整保留用于审计。若 Auditor 或 Writer 对某一具体 claim、数字、图表或限制提出可定位的证据疑点，主 optimizer 可以按需回溯对应记录并只补充解决该疑点所需的最小上下文；不得因此把完整 optimization history 自动暴露给 writer。
 
-## S7 Visual Writing 兼容契约
-
-该契约只描述 optimizer 与目标 MathModel writer 的交接边界，不在本仓库实现 renderer、ImageGen、visual validator 或新的 stage engine。是否具备这些能力，以目标项目当前 `paper-formal-writer` 源码和门禁为准；目标 writer 未实现时不得由 optimizer 伪造 `writing_visual_manifest.json`、手写 PASS 或复制一套 writer 来绕过能力缺口。
-
-当目标 MathModel 已提供 Visual Writing Pass 时，正式视觉资产必须区分两条权威链：
-
-```text
-scientific evidence figures
-→ result_evidence / data_exploration / sensitivity_evidence
-→ 由模型、数据或正式计算产生
-→ figure_index.json
-→ S6 evidence
-
-S7 writing visuals
-→ method_flow / algorithm_flow / method_architecture / validation_protocol
-→ scenario_schematic / mechanism_schematic / conceptual_overview
-→ writing_visual_manifest.json
-→ S7 writing asset
-```
-
-两类资产不得互相替代。S7 不修改 `figure_index.json`，也不把 writing visual 纳入 S6 evidence gate。若目标 writer 使用可选 `writing_visual_manifest.json`，其新增、修改或 hash 变化只应使 S7/S8 对应状态失效；S6 仍以原 scientific evidence chain 判定。
-
-推荐 renderer 路由保持单向：
-
-```text
-result_evidence / data_exploration / sensitivity_evidence
-→ existing evidence/data plotting
-
-method_flow / algorithm_flow / method_architecture / validation_protocol
-→ deterministic renderer
-
-scenario_schematic / mechanism_schematic / conceptual_overview
-→ Codex/native image generation
-```
-
-Writer 不得为了“有图”而补图。只有视觉资产能够降低理解成本、解释关键方法/机制/场景、支撑正文论证或满足题目/正式写作要求时才应生成。所有新图必须检查真实渲染结果；deterministic source parse PASS 或 ImageGen prompt 成功都不等于最终图 PASS。
-
-如果 Writer 发现缺少的是科学结果图，例如正式敏感性曲线、结果比较图或数据证据图，不得在 S7 现场绘制替代品。返回：
-
-```text
-status = EVIDENCE_BLOCKER
-blocker = EVIDENCE_VISUAL_GAP
-```
-
-主 optimizer 将其路由回 FORMAL_REFRESH / 对应 evidence layer，由真实模型/数据可视化生成图、更新 `figure_index.json`、重跑受影响 S6，再回 WRITING。只有方法图、流程图、架构/验证协议图和场景/机制/概念示意图属于 S7 writing visual。
-
-Writing Handoff Filter 对视觉资产采用最小白名单：传递 accepted evidence figures、已注册且正文确有需要的 writing visuals、对应用途与 authoritative locator；不把未采用草图、失败生成记录或视觉修复历史默认交给 Writer。Final QA 必须核对最终正文引用、实际文件/hash、DOCX/PDF 中真实插入与可读性；不能仅核对 source、prompt 或 manifest 字段。
-
-在目标 writer 已实现该能力时，Visual Writing Pass 位于 assembled audit 之后、global revision / final audit 之前。若目标 writer 尚未实现，则继续其当前 authoring 行为并明确报告 capability gap；optimizer 不新增 S6.5/S7.5，也不自行改变 MathModel 的 S0–S8 stage graph。
-
 ## writer 与编译交接
 
 论文修订需使摘要与完整方案一致，由问题特征解释模型选择，讲清公式的目的、变量和作用；题目要求的实际答案应能定位，结果解释须有证据，小问之间的依赖应清楚，创新和局限须对应实际修改、验证及适用边界。修订时双向核对：
